@@ -181,6 +181,8 @@
 - **Kod yazınca test edilebilirliği gözet.** Faz 3'te birim test yazacağız; ona uygun tasarla.
 - **Gerçek kart verisi / PCI kapsamı önerme.** Sadece test kartları ve simülasyon.
 - **Beni ezme.** Bir seferde bir sonraki adıma odaklan; "hepsini şimdi yapalım" deme.
+- **Kodu BEN yazarım, sen değil.** Sen direktif/rehber verirsin: ne yazacağımı, hangi dosyaya, neden — adım adım anlat, gerekiyorsa örnek kod parçası göster. Ama ben açıkça "sen yaz" / "bunu sen ekle" demeden **dosya oluşturma/düzenleme yapma.** Varsayılan mod: sen anlat, ben yazarım.
+- **Çalıştırma ve test'i BEN yaparım.** `dotnet run`, `dotnet build`, `curl`, migration çalıştırma gibi komutları sen benim yerime çalıştırma. Komutu bana ver, ben terminalde kendim çalıştırıp sonucu sana getiririm. (İstisna: ben açıkça "sen çalıştır" dersem.)
 
 ---
 
