@@ -28,6 +28,14 @@ public class AppDbContext : DbContext
         {
             merchant.HasIndex(m => m.ApiKey).IsUnique();
         });
+        
+        modelBuilder.Entity<Merchant>().HasData(new Merchant
+        {
+            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Name = "Test Merchant",
+            ApiKey = "sk_test_123456789",
+            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
