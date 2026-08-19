@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Data;
+using PaymentGateway.Api.Middleware;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference(); // /scalar → OpenAPI JSON'ı şık arayüze çevirir
 }
+
+app.UseMiddleware<ApiKeyAuthMiddleware>();
 
 app.UseHttpsRedirection();
 
