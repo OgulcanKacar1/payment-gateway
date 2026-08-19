@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Data;
 using PaymentGateway.Api.Middleware;
+using PaymentGateway.Api.Services;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,7 +15,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 var app = builder.Build();
 
