@@ -67,4 +67,46 @@ public class PaymentController : ControllerBase
             _ => BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!))
         };
     }
+
+    [HttpPost("{id}/void")]
+    public async Task<IActionResult> Void(Guid id)
+    {
+        var merchant = (Merchant)HttpContext.Items["Merchant"]!;
+        
+        var result = await _paymentService.VoidAsync(merchant.Id, id);
+        
+        if(result.IsSuccess)
+            return Ok(ApiResponse<PaymentResponse>.Ok(result.Data!));
+
+        return result.ErrorType switch
+        {
+            ServiceErrorType.NotFound =>
+                NotFound(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            ServiceErrorType.Conflict =>
+                Conflict(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!))
+        };
+
+    }
+    
+    [HttpPost("{id}/refund")]
+    public async Task<IActionResult> Refund(Guid id)
+    {
+        var merchant = (Merchant)HttpContext.Items["Merchant"]!;
+        
+        var result = await _paymentService.RefundAsync(merchant.Id, id);
+        
+        if(result.IsSuccess)
+            return Ok(ApiResponse<PaymentResponse>.Ok(result.Data!));
+
+        return result.ErrorType switch
+        {
+            ServiceErrorType.NotFound =>
+                NotFound(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            ServiceErrorType.Conflict =>
+                Conflict(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!))
+        };
+    }
+    
 }

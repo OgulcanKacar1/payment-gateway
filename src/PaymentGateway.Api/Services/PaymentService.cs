@@ -48,18 +48,8 @@ public class PaymentService : IPaymentService
         
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync();
-
-        var response = new PaymentResponse
-        {
-            Id = payment.Id,
-            Amount = payment.Amount,
-            Currency = payment.Currency,
-            CardLast4 = payment.CardLast4,
-            Status = payment.Status.ToString(),
-            CreatedAt = payment.CreatedAt
-        };
         
-        return ServiceResult<PaymentResponse>.Success(response);
+        return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
 
     public async Task<ServiceResult<PaymentResponse>> GetByIdAsync(Guid merchantId, Guid paymentId)
@@ -69,18 +59,8 @@ public class PaymentService : IPaymentService
 
         if (payment == null)
             return ServiceResult<PaymentResponse>.Failure("Ödeme bulunamadı.", ServiceErrorType.NotFound);
-
-        var response = new PaymentResponse
-        {
-            Id = payment.Id,
-            Amount = payment.Amount,
-            Currency = payment.Currency,
-            CardLast4 = payment.CardLast4,
-            Status = payment.Status.ToString(),
-            CreatedAt = payment.CreatedAt
-        };
         
-        return ServiceResult<PaymentResponse>.Success(response);
+        return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
 
     public async Task<ServiceResult<PaymentResponse>> CaptureAsync(Guid merchantId, Guid paymentId)
@@ -99,16 +79,53 @@ public class PaymentService : IPaymentService
         payment.Status = PaymentStatus.Captured;
         await _db.SaveChangesAsync();
         
-        var response = new PaymentResponse
-        {
-            Id = payment.Id,
-            Amount = payment.Amount,
-            Currency = payment.Currency,
-            CardLast4 = payment.CardLast4,
-            Status = payment.Status.ToString(),
-            CreatedAt = payment.CreatedAt
-        };
-        
-        return ServiceResult<PaymentResponse>.Success(response);
+        return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
+
+
+    public async Task<ServiceResult<PaymentResponse>> VoidAsync(Guid merchantId, Guid paymentId)
+    {
+        var payment = await _db.Payments
+            .FirstOrDefaultAsync(p => p.Id == paymentId && p.MerchantId == merchantId);
+        
+        if (payment is null)
+            return ServiceResult<PaymentResponse>.Failure("Ödeme bulunamadı", ServiceErrorType.NotFound);
+        
+        if(payment.Status != PaymentStatus.Authorized)
+            return ServiceResult<PaymentResponse>.Failure(
+                $"Bu ödeme void edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
+        
+        payment.Status = PaymentStatus.Voided;
+        await _db.SaveChangesAsync();
+        
+        return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
+    }
+
+    public async Task<ServiceResult<PaymentResponse>> RefundAsync(Guid merchantId, Guid paymentId)
+    {
+        var payment = await _db.Payments
+            .FirstOrDefaultAsync(p => p.Id == paymentId && p.MerchantId == merchantId);
+        
+        if(payment is null)
+            return ServiceResult<PaymentResponse>.Failure("Ödeme bulunamadı", ServiceErrorType.NotFound);
+        
+        if(payment.Status != PaymentStatus.Captured)
+            return ServiceResult<PaymentResponse>.Failure(
+                $"Bu ödeme refund edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
+        
+        payment.Status = PaymentStatus.Refunded;
+        await _db.SaveChangesAsync();
+        
+        return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
+    }
+    
+    private static PaymentResponse MapToResponse(Payment payment) => new()
+    {
+        Id = payment.Id,
+        Amount = payment.Amount,
+        Currency = payment.Currency,
+        CardLast4 = payment.CardLast4,
+        Status = payment.Status.ToString(),
+        CreatedAt = payment.CreatedAt
+    };
 }

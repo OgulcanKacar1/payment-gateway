@@ -8,4 +8,6 @@ public interface IPaymentService
     Task<ServiceResult<PaymentResponse>> AuthorizeAsync(Guid merchantId, CreatePaymentRequest paymentRequest);
     Task<ServiceResult<PaymentResponse>> GetByIdAsync(Guid merchantId, Guid paymentId);
     Task<ServiceResult<PaymentResponse>> CaptureAsync(Guid merchantId, Guid paymentId);
+    Task<ServiceResult<PaymentResponse>> VoidAsync(Guid merchantId, Guid paymentId);
+    Task<ServiceResult<PaymentResponse>> RefundAsync(Guid merchantId, Guid paymentId);
 }
