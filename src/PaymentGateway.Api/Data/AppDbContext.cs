@@ -10,6 +10,8 @@ public class AppDbContext : DbContext
     }
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Merchant> Merchants => Set<Merchant>();
+    
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +38,10 @@ public class AppDbContext : DbContext
             ApiKey = "sk_test_123456789",
             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
         });
+        
+        modelBuilder.Entity<IdempotencyRecord>()
+            .HasIndex(r => new { r.MerchantId, r.Key })
+            .IsUnique();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

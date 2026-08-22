@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using PaymentGateway.Api.Common;
 using PaymentGateway.Api.DTOs;
@@ -11,23 +12,57 @@ namespace PaymentGateway.Api.Controllers;
 public class PaymentController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly IIdempotencyService _idempotencyService;
     
-    public PaymentController(IPaymentService paymentService)
+    public PaymentController(IPaymentService paymentService, IIdempotencyService idempotencyService)
     {
         _paymentService = paymentService;
+        _idempotencyService = idempotencyService;
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePaymentRequest request)
     {
         var merchant = (Merchant)HttpContext.Items["Merchant"]!;
+        var idempotencyKey = Request.Headers["Idempotency-Key"].ToString();
+        var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
+
+        if (hasKey)
+        {
+            var existing = await _idempotencyService.GetAsync(merchant.Id, idempotencyKey);
+            if (existing is not null)
+                return new ContentResult
+                {
+                    StatusCode = existing.StatusCode,
+                    Content = existing.ResponseBody,
+                    ContentType = "application/json"
+                };
+        }
 
         var result = await _paymentService.AuthorizeAsync(merchant.Id, request);
+
+        int statusCode;
+        object body;
+
+        if (result.IsSuccess)
+        {
+            statusCode = StatusCodes.Status200OK;
+            body = ApiResponse<PaymentResponse>.Ok(result.Data!);
+        }
+        else
+        {
+            statusCode = StatusCodes.Status400BadRequest;
+            body = ApiResponse<object>.Fail(result.ErrorMessage!);
+        }
         
-        if(!result.IsSuccess)
-            return BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!));
+        // key varsa cevabı kaydet(bir sonraki isteklerde aynı cevabı döndürmek için)
+        if (hasKey)
+        {
+            var json = JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await _idempotencyService.SaveAsync(merchant.Id, idempotencyKey, statusCode, json);
+        }
         
-        return Ok(ApiResponse<PaymentResponse>.Ok(result.Data!));
+        return StatusCode(statusCode, body);
     }
 
     [HttpGet("{id}")]
