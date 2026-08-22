@@ -229,6 +229,16 @@ yapıştıracağım hazır bir not üret. Şu formatta, kopyala-yapıştır olac
 - **Yarın ilk iş:** (bir sonraki somut adım, boş sayfa korkusu olmasın diye)
 - **CLAUDE.md'ye taşınmalı mı?** (bugün kalıcı bir mimari karar/kural çıktıysa ayrıca belirt)
 
+Ayrıca, yukarıdaki Notion bloğunun **ardından ayrı bir "Çalışma listesi"** üret: o gün kullanıcının
+sorduğu / takıldığı temel kavramları topla (async/await, generics, nullable, middleware, EF Core vb.).
+Her kavram için şunu ver:
+- **Konu başlığı** (net, aranabilir isim)
+- **Kısa özet** (2-3 cümle: ne olduğu + neden önemli)
+- **Kendi başına çalışması için arama terimleri / kaynak** (ör. Microsoft Learn, resmi dokümantasyon)
+
+Amaç: kullanıcı gün sonundan sonra bu konuları hem seninle hem internetten kendisi pekiştirebilsin.
+Bu çalışma listesini sadece o günkü gerçek soruları/takılmalardan çıkar — genel liste uydurma.
+
 Not: Bu özeti Notion için üretiyorsun; CLAUDE.md'yi sen güncelleme, sadece bana metni ver.
 
 ---
