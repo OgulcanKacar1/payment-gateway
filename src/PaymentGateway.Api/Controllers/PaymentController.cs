@@ -29,4 +29,22 @@ public class PaymentController : ControllerBase
         
         return Ok(ApiResponse<PaymentResponse>.Ok(result.Data!));
     }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var merchant = (Merchant)HttpContext.Items["Merchant"]!;
+        
+        var result = await _paymentService.GetByIdAsync(merchant.Id, id);
+        
+        if(result.IsSuccess)
+            return Ok(ApiResponse<PaymentResponse>.Ok(result.Data!));
+
+        return result.ErrorType switch
+        {
+            ServiceErrorType.NotFound =>
+                NotFound(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!))
+        };
+    }
 }

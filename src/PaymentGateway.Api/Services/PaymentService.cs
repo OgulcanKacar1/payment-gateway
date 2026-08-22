@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Common;
 using PaymentGateway.Api.Data;
 using PaymentGateway.Api.DTOs;
@@ -47,6 +48,27 @@ public class PaymentService : IPaymentService
         
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync();
+
+        var response = new PaymentResponse
+        {
+            Id = payment.Id,
+            Amount = payment.Amount,
+            Currency = payment.Currency,
+            CardLast4 = payment.CardLast4,
+            Status = payment.Status.ToString(),
+            CreatedAt = payment.CreatedAt
+        };
+        
+        return ServiceResult<PaymentResponse>.Success(response);
+    }
+
+    public async Task<ServiceResult<PaymentResponse>> GetByIdAsync(Guid merchantId, Guid paymentId)
+    {
+        var payment = await _db.Payments
+            .FirstOrDefaultAsync(p => p.Id == paymentId && p.MerchantId == merchantId);
+
+        if (payment == null)
+            return ServiceResult<PaymentResponse>.Failure("Ödeme bulunamadı.", ServiceErrorType.NotFound);
 
         var response = new PaymentResponse
         {
