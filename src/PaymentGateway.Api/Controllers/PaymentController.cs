@@ -47,4 +47,24 @@ public class PaymentController : ControllerBase
             _ => BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!))
         };
     }
+
+    [HttpPost("{id}/capture")]
+    public async Task<IActionResult> Capture(Guid id)
+    {
+        var merchant = (Merchant)HttpContext.Items["Merchant"]!;
+        
+        var result = await _paymentService.CaptureAsync(merchant.Id, id);
+        
+        if(result.IsSuccess)
+            return Ok(ApiResponse<PaymentResponse>.Ok(result.Data!));
+
+        return result.ErrorType switch
+        {
+            ServiceErrorType.NotFound =>
+                NotFound(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            ServiceErrorType.Conflict =>
+                Conflict(ApiResponse<object>.Fail(result.ErrorMessage!)),
+            _ => BadRequest(ApiResponse<object>.Fail(result.ErrorMessage!))
+        };
+    }
 }
