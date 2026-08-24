@@ -42,4 +42,6 @@ public class WebhookSender : IWebhookSender
             return false; // ağ hatası, timeout, DNS hatası vs. gibi durumlarda false döndür
         }
     }
+
+    
 }

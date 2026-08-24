@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Common;
 using PaymentGateway.Api.Data;
@@ -47,6 +48,8 @@ public class PaymentService : IPaymentService
         };
         
         _db.Payments.Add(payment);
+        var eventType = status == PaymentStatus.Authorized ? "payment.authorized" : "payment.failed";
+        AddWebhookEvent(payment, eventType);
         await _db.SaveChangesAsync();
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
@@ -77,6 +80,7 @@ public class PaymentService : IPaymentService
                 $"Bu ödeme capture edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
         
         payment.Status = PaymentStatus.Captured;
+        AddWebhookEvent(payment, "payment.captured"); // webhook event ekle
         await _db.SaveChangesAsync();
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
@@ -96,6 +100,7 @@ public class PaymentService : IPaymentService
                 $"Bu ödeme void edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
         
         payment.Status = PaymentStatus.Voided;
+        AddWebhookEvent(payment, "payment.voided");
         await _db.SaveChangesAsync();
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
@@ -114,6 +119,7 @@ public class PaymentService : IPaymentService
                 $"Bu ödeme refund edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
         
         payment.Status = PaymentStatus.Refunded;
+        AddWebhookEvent(payment, "payment.refunded");
         await _db.SaveChangesAsync();
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
@@ -128,4 +134,25 @@ public class PaymentService : IPaymentService
         Status = payment.Status.ToString(),
         CreatedAt = payment.CreatedAt
     };
+    
+    private void AddWebhookEvent(Payment payment, string eventType)
+    {
+        var payload = JsonSerializer.Serialize(new
+        {
+            eventType,
+            payment = MapToResponse(payment)
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            
+            _db.WebhookEvents.Add(new WebhookEvent
+                {
+                    MerchantId = payment.MerchantId,
+                    PaymentId = payment.Id,
+                    EventType = eventType,
+                    Payload = payload,
+                    Status = WebhookEventStatus.Pending,
+                    NextAttemptAt =  DateTime.UtcNow //hemen gönderilmeye hazır
+                    
+                }
+        );
+    }
 }
