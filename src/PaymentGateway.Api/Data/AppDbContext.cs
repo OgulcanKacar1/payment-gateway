@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using PaymentGateway.Api.Models.Entities;
 
 namespace PaymentGateway.Api.Data;
@@ -10,6 +11,7 @@ public class AppDbContext : DbContext
     }
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Merchant> Merchants => Set<Merchant>();
+    public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
@@ -42,6 +44,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<IdempotencyRecord>()
             .HasIndex(r => new { r.MerchantId, r.Key })
             .IsUnique();
+
+        modelBuilder.Entity<WebhookEvent>(webhook =>
+        {
+            webhook.Property(w => w.Status).HasConversion<string>();
+            webhook.Property(w => w.EventType).HasMaxLength(50);
+        });
+
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
