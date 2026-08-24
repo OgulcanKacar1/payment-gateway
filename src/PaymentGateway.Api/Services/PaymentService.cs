@@ -44,7 +44,8 @@ public class PaymentService : IPaymentService
             Amount = request.Amount,
             Currency = request.Currency,
             CardLast4 = last4,
-            Status = status
+            Status = status,
+            CreatedAt = DateTime.UtcNow
         };
         
         _db.Payments.Add(payment);
