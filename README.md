@@ -1,5 +1,7 @@
 # Payment Gateway API
 
+![CI](https://github.com/OgulcanKacar1/payment-gateway/actions/workflows/ci.yml/badge.svg)
+
 A backend **payment gateway simulation** built with .NET, modeled after providers like Stripe and iyzico. It implements the *core logic* of a payment service provider — payment lifecycle, idempotency, and signed webhooks — as a portfolio project focused on clean, testable, enterprise-style backend design.
 
 > ⚠️ **Scope:** This is a learning/portfolio project. It uses **standard test card numbers only** and never processes real card data (no PCI-DSS scope). The goal is to demonstrate payment-system *logic and patterns*, not to be a production gateway.
