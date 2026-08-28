@@ -73,37 +73,39 @@ curl -X POST http://localhost:5142/v1/payments \
 
 ## Getting Started
 
-### Prerequisites
+### Option A — Run with Docker (recommended)
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Docker (or [OrbStack](https://orbstack.dev)) for PostgreSQL
-
-### 1. Start PostgreSQL
+The only requirement is Docker (or [OrbStack](https://orbstack.dev)). One command builds the API image, starts PostgreSQL, applies migrations on startup, and runs everything together:
 
 ```bash
+docker compose up --build
+```
+
+### Option B — Run locally (.NET SDK)
+
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) plus Docker for PostgreSQL.
+
+```bash
+# 1. Start PostgreSQL
 docker run --name paymentgateway-db \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=paymentgateway \
   -p 5432:5432 -d postgres:17
-```
 
-### 2. Apply migrations
-
-```bash
+# 2. Apply migrations
 dotnet ef database update --project src/PaymentGateway.Api
-```
 
-### 3. Run the API
-
-```bash
+# 3. Run the API
 dotnet run --project src/PaymentGateway.Api --launch-profile http
 ```
+
+### Once it's running
 
 - API: `http://localhost:5142`
 - Interactive API docs (Scalar): `http://localhost:5142/scalar`
 - Seeded test merchant API key: `sk_test_123456789`
 
-### 4. Run the tests
+### Run the tests
 
 ```bash
 dotnet test
@@ -128,7 +130,7 @@ payment-gateway/
 
 ## Roadmap
 
-- [ ] Dockerfile + docker-compose (API + Postgres)
+- [x] Dockerfile + docker-compose (API + Postgres)
 - [ ] CI/CD pipeline (GitHub Actions: build + test)
 - [ ] Cloud deployment (live URL + managed Postgres)
 - [ ] Message queue for webhook delivery (RabbitMQ)
