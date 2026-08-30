@@ -4,7 +4,7 @@
 
 **Live demo:** [payment-gateway-zxyk.onrender.com/scalar](https://payment-gateway-zxyk.onrender.com/scalar) — interactive API docs (free tier; the first request may take ~50s to wake the instance).
 
-A backend **payment gateway simulation** built with .NET, modeled after providers like Stripe and iyzico. It implements the *core logic* of a payment service provider — payment lifecycle, idempotency, and signed webhooks — as a portfolio project focused on clean, testable, enterprise-style backend design.
+A backend **payment gateway simulation** built with .NET, modeled after providers like Stripe and iyzico. It implements the *core logic* of a payment service provider — payment lifecycle, idempotency, signed webhooks, and rate limiting — as a portfolio project focused on clean, testable, enterprise-style backend design.
 
 > ⚠️ **Scope:** This is a learning/portfolio project. It uses **standard test card numbers only** and never processes real card data (no PCI-DSS scope). The goal is to demonstrate payment-system *logic and patterns*, not to be a production gateway.
 
@@ -13,7 +13,9 @@ A backend **payment gateway simulation** built with .NET, modeled after provider
 ## Features
 
 - **API key authentication** — merchants authenticate via `Authorization: Bearer sk_test_...` (custom middleware).
+- **Rate limiting (Redis)** — per-merchant fixed-window limit enforced in middleware using Redis atomic `INCR` + TTL; requests over the limit get `429 Too Many Requests`.
 - **Payment lifecycle as a finite state machine** — `Pending → Authorized → Captured → Refunded`, plus `Authorized → Voided` and `Pending → Failed`. Invalid transitions are rejected with `409 Conflict`.
+- **Request validation** — data-annotation validation on incoming DTOs (amount, currency, card format); errors are returned in the unified `ApiResponse` envelope.
 - **Card validation** — Luhn algorithm + test-card rules.
 - **Idempotency** — an `Idempotency-Key` header prevents duplicate charges; the first response is stored and replayed for repeated requests.
 - **Signed webhooks** — payment status changes are delivered to the merchant's URL via a background service, signed with **HMAC-SHA256**, with **retry + exponential backoff** on failure (outbox pattern).
@@ -22,7 +24,7 @@ A backend **payment gateway simulation** built with .NET, modeled after provider
 
 ## Tech Stack
 
-.NET 10 · ASP.NET Core Web API · Entity Framework Core · PostgreSQL · xUnit · Scalar (OpenAPI UI) · Docker / OrbStack
+.NET 10 · ASP.NET Core Web API · Entity Framework Core · PostgreSQL · Redis (StackExchange.Redis) · xUnit · Scalar (OpenAPI UI) · Docker / OrbStack
 
 ---
 
@@ -79,7 +81,7 @@ curl -X POST http://localhost:5142/v1/payments \
 
 ### Option A — Run with Docker (recommended)
 
-The only requirement is Docker (or [OrbStack](https://orbstack.dev)). One command builds the API image, starts PostgreSQL, applies migrations on startup, and runs everything together:
+The only requirement is Docker (or [OrbStack](https://orbstack.dev)). One command builds the API image, starts PostgreSQL and Redis, applies migrations on startup, and runs everything together:
 
 ```bash
 docker compose up --build
@@ -87,7 +89,7 @@ docker compose up --build
 
 ### Option B — Run locally (.NET SDK)
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) plus Docker for PostgreSQL.
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) plus Docker for PostgreSQL and Redis.
 
 ```bash
 # 1. Start PostgreSQL
@@ -96,10 +98,13 @@ docker run --name paymentgateway-db \
   -e POSTGRES_DB=paymentgateway \
   -p 5432:5432 -d postgres:17
 
-# 2. Apply migrations
+# 2. Start Redis
+docker run --name paymentgateway-redis -p 6379:6379 -d redis:7
+
+# 3. Apply migrations
 dotnet ef database update --project src/PaymentGateway.Api
 
-# 3. Run the API
+# 4. Run the API
 dotnet run --project src/PaymentGateway.Api --launch-profile http
 ```
 
@@ -124,7 +129,7 @@ payment-gateway/
 ├── src/PaymentGateway.Api/
 │   ├── Controllers/      # HTTP endpoints
 │   ├── Services/         # Business logic (payments, idempotency, webhooks)
-│   ├── Middleware/       # API key authentication
+│   ├── Middleware/       # API key auth + Redis rate limiting
 │   ├── Models/           # Entities + enums (state machine)
 │   ├── DTOs/             # Request/response contracts
 │   ├── Data/             # EF Core DbContext
@@ -134,6 +139,7 @@ payment-gateway/
 
 ## Roadmap
 
+- [x] Redis rate limiting (per-merchant, fixed window)
+- [ ] Redis idempotency cache (cache-aside over PostgreSQL)
 - [ ] Message queue for webhook delivery (RabbitMQ)
-- [ ] Redis for idempotency cache + rate limiting
 - [ ] Double-entry ledger & settlement reporting
