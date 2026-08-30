@@ -31,6 +31,10 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
+    StackExchange.Redis.ConnectionMultiplexer.Connect(
+        builder.Configuration.GetConnectionString("Redis")!));
+
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
 builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
@@ -55,6 +59,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ApiKeyAuthMiddleware>();
+app.UseMiddleware<RateLimitMiddleware>();
 
 app.UseHttpsRedirection();
 
