@@ -12,6 +12,19 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 // Add services to the container.
 
 builder.Services.AddControllers();
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var message = string.Join(" ",
+            context.ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage));
+
+        var response = PaymentGateway.Api.Common.ApiResponse<object>.Fail(message);
+        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(response);
+    };
+});
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
