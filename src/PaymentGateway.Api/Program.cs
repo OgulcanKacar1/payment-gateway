@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Data;
 using PaymentGateway.Api.Middleware;
@@ -38,6 +39,13 @@ builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
     config.AbortOnConnectFail = false;   // Redis'e ulaşılamazsa uygulama başlangıçta patlamasın
     return StackExchange.Redis.ConnectionMultiplexer.Connect(config);
 });
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();   // Render'ın proxy'si varsayılan listede değil → header'a güven
+    options.KnownProxies.Clear();
+});
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
 builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
@@ -47,6 +55,7 @@ builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
 builder.Services.AddHostedService<WebhookDeliveryService>();
 
 var app = builder.Build();
+
 
 using (var scope = app.Services.CreateScope())
 {
@@ -61,6 +70,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(); // /scalar → OpenAPI JSON'ı şık arayüze çevirir
 }
 
+app.UseForwardedHeaders();
 app.UseMiddleware<ApiKeyAuthMiddleware>();
 app.UseMiddleware<RateLimitMiddleware>();
 
