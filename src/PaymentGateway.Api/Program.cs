@@ -32,9 +32,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
-    StackExchange.Redis.ConnectionMultiplexer.Connect(
-        builder.Configuration.GetConnectionString("Redis")!));
-
+{
+    var config = StackExchange.Redis.ConfigurationOptions.Parse(
+        builder.Configuration.GetConnectionString("Redis")!);
+    config.AbortOnConnectFail = false;   // Redis'e ulaşılamazsa uygulama başlangıçta patlamasın
+    return StackExchange.Redis.ConnectionMultiplexer.Connect(config);
+});
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
 builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
