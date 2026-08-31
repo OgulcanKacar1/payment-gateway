@@ -38,7 +38,7 @@ public class PaymentServiceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
         
-        var service = new PaymentService(db);
+        var service = new PaymentService(db, new LedgerService(db));
         
         //Act: Failed bir ödemeyi Capture etmeye çalış
         var result = await service.CaptureAsync(merchantId, payment.Id);
@@ -66,7 +66,7 @@ public class PaymentServiceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
         
-        var service = new PaymentService(db);
+        var service = new PaymentService(db, new LedgerService(db));
         
         //Act: Authorized bir ödemeyi Capture et
         var result = await service.CaptureAsync(merchantId, payment.Id);
@@ -93,7 +93,7 @@ public class PaymentServiceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
 
-        var service = new PaymentService(db);
+        var service = new PaymentService(db, new LedgerService(db));
 
         // Act
         var result = await service.RefundAsync(merchantId, payment.Id);

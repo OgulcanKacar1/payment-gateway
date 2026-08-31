@@ -4,7 +4,7 @@
 
 **Live demo:** [payment-gateway-zxyk.onrender.com/scalar](https://payment-gateway-zxyk.onrender.com/scalar) — interactive API docs (free tier; the first request may take ~50s to wake the instance).
 
-A backend **payment gateway simulation** built with .NET, modeled after providers like Stripe and iyzico. It implements the *core logic* of a payment service provider — payment lifecycle, idempotency, signed webhooks, and rate limiting — as a portfolio project focused on clean, testable, enterprise-style backend design.
+A backend **payment gateway simulation** built with .NET, modeled after providers like Stripe and iyzico. It implements the *core logic* of a payment service provider — payment lifecycle, idempotency, signed webhooks, rate limiting, and a double-entry ledger — as a portfolio project focused on clean, testable, enterprise-style backend design.
 
 > ⚠️ **Scope:** This is a learning/portfolio project. It uses **standard test card numbers only** and never processes real card data (no PCI-DSS scope). The goal is to demonstrate payment-system *logic and patterns*, not to be a production gateway.
 
@@ -19,8 +19,9 @@ A backend **payment gateway simulation** built with .NET, modeled after provider
 - **Card validation** — Luhn algorithm + test-card rules.
 - **Idempotency** — an `Idempotency-Key` header prevents duplicate charges; the first response is stored and replayed for repeated requests.
 - **Signed webhooks** — payment status changes are delivered to the merchant's URL via a background service, signed with **HMAC-SHA256**, with **retry + exponential backoff** on failure (outbox pattern).
+- **Double-entry ledger** — capture/refund post balanced, append-only ledger entries (each transaction sums to zero); merchant balances are *derived* from the ledger, not stored, plus a daily settlement report.
 - **Layered architecture** — Controller / Service / DTO / Data separation, `ServiceResult<T>` ↔ `ApiResponse<T>` pattern, automatic audit fields, merchant data isolation.
-- **Unit tests** — xUnit with EF Core InMemory (Luhn, state-machine guards, idempotency).
+- **Unit tests** — xUnit with EF Core InMemory (Luhn, state-machine guards, idempotency, ledger balance & zero-sum invariant).
 
 ## Tech Stack
 
@@ -45,6 +46,15 @@ stateDiagram-v2
 
 `Failed`, `Voided`, and `Refunded` are terminal states.
 
+## Double-Entry Ledger
+
+Money movements are recorded in an append-only, double-entry ledger — the same principle banks and providers like Stripe use.
+
+- Every real money event posts **two balanced entries** under one transaction: a **capture** credits the merchant's balance (`+amount`) and debits a clearing account (`−amount`); a **refund** posts the reverse. Each transaction **always sums to zero** — money is never created or destroyed.
+- Ledger entries are **immutable** (never updated or deleted); a correction is a new reversing entry, preserving a full audit trail.
+- A merchant's **balance is derived** as the sum of its ledger entries — never stored as a mutable field — so it can't drift out of sync.
+- Only `Captured` and `Refunded` post to the ledger (real money moved); `Authorized`/`Voided` do not (funds only held/released).
+
 ## API Endpoints
 
 All endpoints are under `/v1` and require `Authorization: Bearer <apiKey>`.
@@ -56,6 +66,8 @@ All endpoints are under `/v1` and require `Authorization: Bearer <apiKey>`.
 | `POST` | `/v1/payments/{id}/capture` | Capture an authorized payment |
 | `POST` | `/v1/payments/{id}/void` | Void an authorized payment |
 | `POST` | `/v1/payments/{id}/refund` | Refund a captured payment |
+| `GET` | `/v1/merchants/me/balance` | Merchant balance per currency (derived from the ledger) |
+| `GET` | `/v1/reports/settlement?date=YYYY-MM-DD` | Daily settlement report (captured / refunded / net), defaults to today |
 
 ### Test cards
 
@@ -128,7 +140,7 @@ dotnet test
 payment-gateway/
 ├── src/PaymentGateway.Api/
 │   ├── Controllers/      # HTTP endpoints
-│   ├── Services/         # Business logic (payments, idempotency, webhooks)
+│   ├── Services/         # Business logic (payments, idempotency, webhooks, ledger)
 │   ├── Middleware/       # API key auth + Redis rate limiting
 │   ├── Models/           # Entities + enums (state machine)
 │   ├── DTOs/             # Request/response contracts
@@ -140,6 +152,6 @@ payment-gateway/
 ## Roadmap
 
 - [x] Redis rate limiting (per-merchant, fixed window)
+- [x] Double-entry ledger, balances & settlement reporting
 - [ ] Redis idempotency cache (cache-aside over PostgreSQL)
 - [ ] Message queue for webhook delivery (RabbitMQ)
-- [ ] Double-entry ledger & settlement reporting
