@@ -2,8 +2,9 @@
   db:
     image: postgres:17
     environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: paymentgateway
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -19,7 +20,7 @@
     ports:
       - "5142:8080"
     environment:
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=paymentgateway;Username=postgres;Password=postgres"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379"
       ASPNETCORE_ENVIRONMENT: Development
     depends_on:
