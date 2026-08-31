@@ -11,10 +11,12 @@ namespace PaymentGateway.Api.Services;
 public class PaymentService : IPaymentService
 {
     private readonly AppDbContext _db;
+    private readonly ILedgerService _ledger;
 
-    public PaymentService(AppDbContext db)
+    public PaymentService(AppDbContext db, ILedgerService ledger)
     {
         _db = db;
+        _ledger = ledger;
     }
 
     public async Task<ServiceResult<PaymentResponse>> AuthorizeAsync(Guid merchantId,
@@ -81,8 +83,9 @@ public class PaymentService : IPaymentService
                 $"Bu ödeme capture edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
         
         payment.Status = PaymentStatus.Captured;
+        _ledger.RecordCapture(payment); // muhasebe kaydı ekle - henüz kaydetmez
         AddWebhookEvent(payment, "payment.captured"); // webhook event ekle
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(); // tüm değişiklikleri kaydet (payment, ledger entry, webhook event)
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
@@ -120,8 +123,9 @@ public class PaymentService : IPaymentService
                 $"Bu ödeme refund edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
         
         payment.Status = PaymentStatus.Refunded;
+        _ledger.RecordRefund(payment); // ters muhasebe kaydı ekle
         AddWebhookEvent(payment, "payment.refunded");
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(); // tüm değişiklikleri kaydet (payment, ledger entry, webhook event)
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }

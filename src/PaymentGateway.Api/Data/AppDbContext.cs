@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Merchant> Merchants => Set<Merchant>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
@@ -49,6 +50,17 @@ public class AppDbContext : DbContext
         {
             webhook.Property(w => w.Status).HasConversion<string>();
             webhook.Property(w => w.EventType).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<LedgerEntry>(entry =>
+        {
+            entry.Property(e => e.Amount).HasPrecision(18, 2); // 18 basamaklı, 2 ondalık
+            entry.Property(e => e.Account).HasConversion<string>(); // Enum to string
+            entry.Property(e => e.Currency).HasMaxLength(3); // ISO 4217
+            entry.Property(e => e.Description).HasMaxLength(200);
+            
+            entry.HasIndex(e => new {e.MerchantId, e.Account}); // bakiye sorgusu: bir merchantın bir hesabındaki tüm entryler
+            entry.HasIndex(e => e.TransactionId); // transaction bazlı sorgu: bir olayın tüm entryleri
         });
 
     }

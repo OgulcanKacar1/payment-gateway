@@ -48,6 +48,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
+builder.Services.AddScoped<ILedgerService, LedgerService>();
+
 builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(10);
