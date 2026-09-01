@@ -41,6 +41,7 @@ builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
     return StackExchange.Redis.ConnectionMultiplexer.Connect(config);
 });
 builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
+builder.Services.AddSingleton<IWebhookPublisher, WebhookPublisher>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
