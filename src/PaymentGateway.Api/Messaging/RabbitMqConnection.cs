@@ -10,12 +10,23 @@ public class RabbitMqConnection : IRabbitMqConnection, IAsyncDisposable
     
     public RabbitMqConnection(IConfiguration config)
     {
-        _factory = new ConnectionFactory
+        var uri = config["RabbitMq:Uri"];
+
+        if (!string.IsNullOrWhiteSpace(uri))
         {
-            HostName = config["RabbitMQ:HostName"]!,
-            UserName = config["RabbitMQ:UserName"]!,
-            Password = config["RabbitMQ:Password"]!
-        };
+            // Prod (CloudAMQP): tek AMQP URI — host/port/user/pass/vhost/TLS hepsi içinde
+            _factory = new ConnectionFactory { Uri = new Uri(uri) };
+        }
+        else
+        {
+            // Local / compose: ayrı ayrı host/user/pass
+            _factory = new ConnectionFactory
+            {
+                HostName = config["RabbitMq:HostName"]!,
+                UserName = config["RabbitMq:UserName"]!,
+                Password = config["RabbitMq:Password"]!
+            };
+        }
     }
 
     public async Task<IConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
