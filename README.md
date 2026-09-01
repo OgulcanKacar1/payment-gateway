@@ -18,14 +18,14 @@ A backend **payment gateway simulation** built with .NET, modeled after provider
 - **Request validation** — data-annotation validation on incoming DTOs (amount, currency, card format); errors are returned in the unified `ApiResponse` envelope.
 - **Card validation** — Luhn algorithm + test-card rules.
 - **Idempotency** — an `Idempotency-Key` header prevents duplicate charges; the first response is stored and replayed for repeated requests.
-- **Signed webhooks** — payment status changes are delivered to the merchant's URL via a background service, signed with **HMAC-SHA256**, with **retry + exponential backoff** on failure (outbox pattern).
+- **Signed webhooks over RabbitMQ** — payment status changes are published to a **RabbitMQ** queue; a background consumer delivers them to the merchant's URL, signed with **HMAC-SHA256**. Publishing and the consumer are **fail-open** (a broker outage degrades gracefully — payments still succeed, the app stays up).
 - **Double-entry ledger** — capture/refund post balanced, append-only ledger entries (each transaction sums to zero); merchant balances are *derived* from the ledger, not stored, plus a daily settlement report.
 - **Layered architecture** — Controller / Service / DTO / Data separation, `ServiceResult<T>` ↔ `ApiResponse<T>` pattern, automatic audit fields, merchant data isolation.
 - **Unit tests** — xUnit with EF Core InMemory (Luhn, state-machine guards, idempotency, ledger balance & zero-sum invariant).
 
 ## Tech Stack
 
-.NET 10 · ASP.NET Core Web API · Entity Framework Core · PostgreSQL · Redis (StackExchange.Redis) · xUnit · Scalar (OpenAPI UI) · Docker / OrbStack
+.NET 10 · ASP.NET Core Web API · Entity Framework Core · PostgreSQL · Redis (StackExchange.Redis) · RabbitMQ · xUnit · Scalar (OpenAPI UI) · Docker / OrbStack
 
 ---
 
@@ -93,7 +93,7 @@ curl -X POST http://localhost:5142/v1/payments \
 
 ### Option A — Run with Docker (recommended)
 
-The only requirement is Docker (or [OrbStack](https://orbstack.dev)). One command builds the API image, starts PostgreSQL and Redis, applies migrations on startup, and runs everything together:
+The only requirement is Docker (or [OrbStack](https://orbstack.dev)). One command builds the API image, starts PostgreSQL, Redis, and RabbitMQ, applies migrations on startup, and runs everything together:
 
 ```bash
 docker compose up --build
@@ -101,7 +101,7 @@ docker compose up --build
 
 ### Option B — Run locally (.NET SDK)
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) plus Docker for PostgreSQL and Redis.
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) plus Docker for PostgreSQL, Redis, and RabbitMQ.
 
 ```bash
 # 1. Start PostgreSQL
@@ -113,10 +113,16 @@ docker run --name paymentgateway-db \
 # 2. Start Redis
 docker run --name paymentgateway-redis -p 6379:6379 -d redis:7
 
-# 3. Apply migrations
+# 3. Start RabbitMQ (management UI on http://localhost:15672)
+docker run --name paymentgateway-rabbitmq \
+  -e RABBITMQ_DEFAULT_USER=paymentgateway \
+  -e RABBITMQ_DEFAULT_PASS=paymentgateway \
+  -p 5672:5672 -p 15672:15672 -d rabbitmq:3-management
+
+# 4. Apply migrations
 dotnet ef database update --project src/PaymentGateway.Api
 
-# 4. Run the API
+# 5. Run the API
 dotnet run --project src/PaymentGateway.Api --launch-profile http
 ```
 
@@ -153,5 +159,6 @@ payment-gateway/
 
 - [x] Redis rate limiting (per-merchant, fixed window)
 - [x] Double-entry ledger, balances & settlement reporting
+- [x] RabbitMQ for webhook delivery (publish/consume, fail-open)
+- [ ] Dead-letter queue + retry for webhook consumer
 - [ ] Redis idempotency cache (cache-aside over PostgreSQL)
-- [ ] Message queue for webhook delivery (RabbitMQ)
