@@ -58,6 +58,7 @@ builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 builder.Services.AddHostedService<WebhookDeliveryService>();
+builder.Services.AddHostedService<WebhookConsumer>();
 
 var app = builder.Build();
 
