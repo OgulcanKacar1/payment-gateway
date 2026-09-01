@@ -5,6 +5,7 @@ using PaymentGateway.Api.Data;
 using PaymentGateway.Api.Models.Entities;
 using PaymentGateway.Api.Services;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client;
 
 namespace PaymentGateway.Api.Messaging;
 
@@ -73,15 +74,17 @@ public class WebhookConsumer : BackgroundService
                     var json = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
                     var message = JsonSerializer.Deserialize<WebhookMessage>(json);
                     
-                    if(message is not null)
-                        await HandleMessageAsync(message, stoppingToken);
+                    var success = message is null || await HandleMessageAsync(message, stoppingToken);
                     
-                    //Başrılı, işlenmiş mesajı kuyruktan sil
+                    if(!success)
+                        await RouteFailedAsync(channel, eventArgs, stoppingToken); // başarısız mesajı retry veya dead kuyruğuna at
+                    
+                    // Orjinali her durumda Actle: başarılı = bitti , başarısız = retry/dead kuyruğuna atıldı
                     await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple:false, cancellationToken: stoppingToken);
                 }
                 catch
                 {
-                    //Hata -> mesajı kuyruğa sokma, at (basit yaklaşım, daha sonra DLQ veya retry mekanizması eklenebilir)
+                    //Hata -> mesajı kuyruğa sokma, at 
                     await channel.BasicNackAsync(eventArgs.DeliveryTag, multiple:false, requeue:false, cancellationToken: stoppingToken);
                 }
             };
@@ -111,7 +114,7 @@ public class WebhookConsumer : BackgroundService
         }
     }
     
-    private async Task HandleMessageAsync(WebhookMessage message, CancellationToken stoppingToken)
+    private async Task<bool> HandleMessageAsync(WebhookMessage message, CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope(); //background servis + DI scope köprüsü
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -119,7 +122,7 @@ public class WebhookConsumer : BackgroundService
         
         var merchant = await db.Merchants.FirstOrDefaultAsync(m => m.Id == message.MerchantId, stoppingToken);
         if (merchant is null)
-            return; //merchant yoksa mesajı at
+            return true; //merchant yoksa mesajı at
         
         // sendasync bir webhook mesajı istiyor ama sadece payloadı kullanıyor -> hafif bir tane kur
         var webhookEvent = new WebhookEvent
@@ -129,6 +132,41 @@ public class WebhookConsumer : BackgroundService
             EventType = message.EventType
         };
         
-        await sender.SendAsync(merchant, webhookEvent);
+        return await sender.SendAsync(merchant, webhookEvent);
+    }
+    
+    //Başarısız mesajı: deneme<max ise retry kuyruğuna, max deneme ise dead kuyruğuna at
+    private async Task RouteFailedAsync(IChannel channel, BasicDeliverEventArgs eventArgs,
+        CancellationToken stoppingToken)
+    {
+        var attempt = GetAttempt(eventArgs) + 1;
+        var targetQueue = attempt >= MaxAttempts ? DeadQueueName : RetryQueueName;
+
+        var properties = new BasicProperties
+        {
+            Persistent = true,
+            Headers = new Dictionary<string, object?> { ["x-attempt"] = attempt } // deneme sayısına taşı
+        };
+        
+        await channel.BasicPublishAsync(
+            exchange: string.Empty,
+            routingKey: targetQueue,
+            mandatory: false,
+            basicProperties: properties,
+            body: eventArgs.Body, // aynı mesaj gövdesi
+            cancellationToken: stoppingToken);
+        
+        _logger.LogWarning("Webhook gönderilemedi (deneme {Attempt}) -> {Queue}", attempt, targetQueue);
+    }
+    
+    // Mesaj başlığından deneme sayısını oku (yoksa 0)
+    private static int GetAttempt(BasicDeliverEventArgs eventArgs)
+    {
+        if (eventArgs.BasicProperties.Headers is { } headers &&
+            headers.TryGetValue("x-attempt", out var value) && value is not null)
+        {
+            try { return Convert.ToInt32(value); } catch { return 0; }
+        }
+        return 0;
     }
 }
