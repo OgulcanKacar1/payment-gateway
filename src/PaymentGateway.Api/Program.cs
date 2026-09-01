@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Data;
+using PaymentGateway.Api.Messaging;
 using PaymentGateway.Api.Middleware;
 using PaymentGateway.Api.Services;
 using Scalar.AspNetCore;
@@ -39,6 +40,8 @@ builder.Services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(sp =>
     config.AbortOnConnectFail = false;   // Redis'e ulaşılamazsa uygulama başlangıçta patlamasın
     return StackExchange.Redis.ConnectionMultiplexer.Connect(config);
 });
+builder.Services.AddSingleton<IRabbitMqConnection, RabbitMqConnection>();
+builder.Services.AddSingleton<IWebhookPublisher, WebhookPublisher>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -55,6 +58,7 @@ builder.Services.AddHttpClient<IWebhookSender, WebhookSender>(client =>
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 builder.Services.AddHostedService<WebhookDeliveryService>();
+builder.Services.AddHostedService<WebhookConsumer>();
 
 var app = builder.Build();
 
