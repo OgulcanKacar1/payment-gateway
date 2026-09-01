@@ -18,7 +18,7 @@ A backend **payment gateway simulation** built with .NET, modeled after provider
 - **Request validation** — data-annotation validation on incoming DTOs (amount, currency, card format); errors are returned in the unified `ApiResponse` envelope.
 - **Card validation** — Luhn algorithm + test-card rules.
 - **Idempotency** — an `Idempotency-Key` header prevents duplicate charges; the first response is stored and replayed for repeated requests.
-- **Signed webhooks over RabbitMQ** — payment status changes are published to a **RabbitMQ** queue; a background consumer delivers them to the merchant's URL, signed with **HMAC-SHA256**. Publishing and the consumer are **fail-open** (a broker outage degrades gracefully — payments still succeed, the app stays up).
+- **Signed webhooks over RabbitMQ** — payment status changes are published to a **RabbitMQ** queue (CloudAMQP in production); a background consumer delivers them to the merchant's URL, signed with **HMAC-SHA256**. Failed deliveries are **retried with a delayed dead-letter queue** (up to 5 attempts, then parked in a dead-letter queue for inspection). Publishing and the consumer are **fail-open** (a broker outage degrades gracefully — payments still succeed, the app stays up).
 - **Double-entry ledger** — capture/refund post balanced, append-only ledger entries (each transaction sums to zero); merchant balances are *derived* from the ledger, not stored, plus a daily settlement report.
 - **Layered architecture** — Controller / Service / DTO / Data separation, `ServiceResult<T>` ↔ `ApiResponse<T>` pattern, automatic audit fields, merchant data isolation.
 - **Unit tests** — xUnit with EF Core InMemory (Luhn, state-machine guards, idempotency, ledger balance & zero-sum invariant).
@@ -154,11 +154,3 @@ payment-gateway/
 │   └── Common/           # ServiceResult, ApiResponse, Luhn, HMAC
 └── tests/PaymentGateway.Api.Tests/   # xUnit tests
 ```
-
-## Roadmap
-
-- [x] Redis rate limiting (per-merchant, fixed window)
-- [x] Double-entry ledger, balances & settlement reporting
-- [x] RabbitMQ for webhook delivery (publish/consume, fail-open)
-- [ ] Dead-letter queue + retry for webhook consumer
-- [ ] Redis idempotency cache (cache-aside over PostgreSQL)
