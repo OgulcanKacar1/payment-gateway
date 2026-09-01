@@ -14,6 +14,11 @@ public class WebhookConsumer : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<WebhookConsumer> _logger;
     
+    private const string RetryQueueName = "webhook-retry-queue";
+    private const string DeadQueueName = "webhook-dead-queue";
+    private const int MaxAttempts = 5;
+    private const int RetryDelayMs = 15000;   // 15 sn bekleme
+    
     public WebhookConsumer(IRabbitMqConnection connection, IServiceScopeFactory scopeFactory, ILogger<WebhookConsumer> logger)
     {
         _connection = connection;
@@ -34,6 +39,25 @@ public class WebhookConsumer : BackgroundService
                 durable: true,
                 exclusive: false,
                 autoDelete: false,
+                cancellationToken: stoppingToken);
+            
+            // Retry (bekleme) kuyruğu: mesaj RetryDelayMs kadar bekler, sonra webhook-queue'ya geri döner
+            var retryArgs = new Dictionary<string, object?>
+            {
+                ["x-message-ttl"] = RetryDelayMs,
+                ["x-dead-letter-exchange"] = "",                          // varsayılan exchange
+                ["x-dead-letter-routing-key"] = WebhookPublisher.QueueName // → webhook-queue
+            };
+            await channel.QueueDeclareAsync(
+                queue: RetryQueueName,
+                durable: true, exclusive: false, autoDelete: false,
+                arguments: retryArgs,
+                cancellationToken: stoppingToken);
+
+            // Dead (mezarlık) kuyruğu: 5 denemede gitmeyen mesajların son durağı
+            await channel.QueueDeclareAsync(
+                queue: DeadQueueName,
+                durable: true, exclusive: false, autoDelete: false,
                 cancellationToken: stoppingToken);
             
             //Aynı anda tek mesaj işlenmesini sağlamak için QoS ayarla
