@@ -28,6 +28,8 @@
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
         
   redis:
     image: redis:7
@@ -36,6 +38,20 @@
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
+      timeout: 5s
+      retries: 5
+      
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672" #AMQP - Uygulamanın RabbitMQ ile iletişim kurması için gerekli port
+      - "15672:15672" #Management UI - RabbitMQ yönetim arayüzüne erişim için gerekli port
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "-q", "ping"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
