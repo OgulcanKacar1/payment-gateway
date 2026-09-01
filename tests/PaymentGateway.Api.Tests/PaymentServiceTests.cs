@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Common;
 using PaymentGateway.Api.Data;
+using PaymentGateway.Api.Messaging;
 using PaymentGateway.Api.Models.Entities;
 using PaymentGateway.Api.Models.Enums;
 using PaymentGateway.Api.Services;
@@ -18,6 +19,12 @@ public class PaymentServiceTests
             .Options;
         
         return new AppDbContext(options);
+    }
+    
+    private class FakePublisher : IWebhookPublisher
+    {
+        public Task PublishAsync(WebhookMessage message, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;   // testte gerçekten publish etmez, hiçbir şey yapmaz
     }
 
     [Fact]
@@ -38,7 +45,7 @@ public class PaymentServiceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
         
-        var service = new PaymentService(db, new LedgerService(db));
+        var service = new PaymentService(db, new LedgerService(db), new FakePublisher());
         
         //Act: Failed bir ödemeyi Capture etmeye çalış
         var result = await service.CaptureAsync(merchantId, payment.Id);
@@ -66,7 +73,7 @@ public class PaymentServiceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
         
-        var service = new PaymentService(db, new LedgerService(db));
+        var service = new PaymentService(db, new LedgerService(db), new FakePublisher());
         
         //Act: Authorized bir ödemeyi Capture et
         var result = await service.CaptureAsync(merchantId, payment.Id);
@@ -93,7 +100,7 @@ public class PaymentServiceTests
         db.Payments.Add(payment);
         await db.SaveChangesAsync();
 
-        var service = new PaymentService(db, new LedgerService(db));
+        var service = new PaymentService(db, new LedgerService(db), new FakePublisher());
 
         // Act
         var result = await service.RefundAsync(merchantId, payment.Id);

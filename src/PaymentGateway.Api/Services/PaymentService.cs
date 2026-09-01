@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PaymentGateway.Api.Messaging;
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Common;
 using PaymentGateway.Api.Data;
@@ -12,11 +13,13 @@ public class PaymentService : IPaymentService
 {
     private readonly AppDbContext _db;
     private readonly ILedgerService _ledger;
+    private readonly IWebhookPublisher _publisher;
 
-    public PaymentService(AppDbContext db, ILedgerService ledger)
+    public PaymentService(AppDbContext db, ILedgerService ledger, IWebhookPublisher publisher)
     {
         _db = db;
         _ledger = ledger;
+        _publisher = publisher;
     }
 
     public async Task<ServiceResult<PaymentResponse>> AuthorizeAsync(Guid merchantId,
@@ -52,8 +55,9 @@ public class PaymentService : IPaymentService
         
         _db.Payments.Add(payment);
         var eventType = status == PaymentStatus.Authorized ? "payment.authorized" : "payment.failed";
-        AddWebhookEvent(payment, eventType);
+        
         await _db.SaveChangesAsync();
+        await PublishWebhookAsync(payment, eventType);
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
@@ -84,8 +88,8 @@ public class PaymentService : IPaymentService
         
         payment.Status = PaymentStatus.Captured;
         _ledger.RecordCapture(payment); // muhasebe kaydı ekle - henüz kaydetmez
-        AddWebhookEvent(payment, "payment.captured"); // webhook event ekle
         await _db.SaveChangesAsync(); // tüm değişiklikleri kaydet (payment, ledger entry, webhook event)
+        await PublishWebhookAsync(payment, "payment.captured");
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
@@ -104,8 +108,8 @@ public class PaymentService : IPaymentService
                 $"Bu ödeme void edilemez. Mevcut durum: {payment.Status}", ServiceErrorType.Conflict);
         
         payment.Status = PaymentStatus.Voided;
-        AddWebhookEvent(payment, "payment.voided");
         await _db.SaveChangesAsync();
+        await PublishWebhookAsync(payment, "payment.voided");
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
@@ -124,8 +128,8 @@ public class PaymentService : IPaymentService
         
         payment.Status = PaymentStatus.Refunded;
         _ledger.RecordRefund(payment); // ters muhasebe kaydı ekle
-        AddWebhookEvent(payment, "payment.refunded");
         await _db.SaveChangesAsync(); // tüm değişiklikleri kaydet (payment, ledger entry, webhook event)
+        await PublishWebhookAsync(payment, "payment.refunded");
         
         return ServiceResult<PaymentResponse>.Success(MapToResponse(payment));
     }
@@ -140,24 +144,19 @@ public class PaymentService : IPaymentService
         CreatedAt = payment.CreatedAt
     };
     
-    private void AddWebhookEvent(Payment payment, string eventType)
+    private async Task PublishWebhookAsync(Payment payment, string eventType)
     {
         var payload = JsonSerializer.Serialize(new
         {
             eventType,
             payment = MapToResponse(payment)
         }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            
-            _db.WebhookEvents.Add(new WebhookEvent
-                {
-                    MerchantId = payment.MerchantId,
-                    PaymentId = payment.Id,
-                    EventType = eventType,
-                    Payload = payload,
-                    Status = WebhookEventStatus.Pending,
-                    NextAttemptAt =  DateTime.UtcNow //hemen gönderilmeye hazır
-                    
-                }
-        );
+
+        await _publisher.PublishAsync(new WebhookMessage
+        {
+            MerchantId = payment.MerchantId,
+            EventType = eventType,
+            Payload = payload
+        });
     }
 }
